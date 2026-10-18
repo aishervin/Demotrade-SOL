@@ -98,9 +98,8 @@ export function TradeForm({
     return `+${roundTo(qtyInSOL * (targetPrice - executionRefPrice), 2)}`;
   }, [qtyInSOL, executionRefPrice]);
 
-  // Handle slider changes
-  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const pct = Number(e.target.value);
+  // Apply percentage allocation
+  const applyPercent = (pct: number) => {
     setPercentSlider(pct);
 
     if (pct === 0) {
@@ -129,6 +128,11 @@ export function TradeForm({
     }
   };
 
+  // Handle slider changes
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    applyPercent(Number(e.target.value));
+  };
+
   const handleAction = (side: OrderSide) => {
     if (qtyInSOL <= 0) return;
 
@@ -150,15 +154,15 @@ export function TradeForm({
 
   return (
     <div className="flex flex-col bg-black text-[#e5e5e5] select-none text-xs font-sans px-2 py-2 w-full">
-      {/* 1. Open / Close Tabs */}
-      <div className="grid grid-cols-2 gap-1 mb-2">
+      {/* 1. Open / Close Tabs - 1.5x Height and Vivid Distinct Colors */}
+      <div className="grid grid-cols-2 gap-2 mb-2.5">
         <button
           type="button"
           onClick={() => setTab('open')}
-          className={`py-1.5 rounded-lg font-bold text-xs transition-colors ${
+          className={`h-14 min-h-[56px] py-3.5 rounded-xl font-extrabold text-base tracking-wider transition-all flex items-center justify-center cursor-pointer active:scale-98 ${
             tab === 'open'
-              ? 'bg-[#1e1e1e] text-white border border-[#333]'
-              : 'bg-[#121212] text-[#777] hover:text-[#bbb]'
+              ? 'bg-[#0ecb81] text-white shadow-lg shadow-[#0ecb81]/30 ring-2 ring-[#0ecb81]/70'
+              : 'bg-[#0ecb81]/15 text-[#0ecb81] border border-[#0ecb81]/40 hover:bg-[#0ecb81]/25 hover:border-[#0ecb81]/60'
           }`}
         >
           Open
@@ -166,10 +170,10 @@ export function TradeForm({
         <button
           type="button"
           onClick={() => setTab('close')}
-          className={`py-1.5 rounded-lg font-bold text-xs transition-colors ${
+          className={`h-14 min-h-[56px] py-3.5 rounded-xl font-extrabold text-base tracking-wider transition-all flex items-center justify-center cursor-pointer active:scale-98 ${
             tab === 'close'
-              ? 'bg-[#f6465d] text-white'
-              : 'bg-[#121212] text-[#777] hover:text-[#bbb]'
+              ? 'bg-[#f6465d] text-white shadow-lg shadow-[#f6465d]/30 ring-2 ring-[#f6465d]/70'
+              : 'bg-[#f6465d]/15 text-[#f6465d] border border-[#f6465d]/40 hover:bg-[#f6465d]/25 hover:border-[#f6465d]/60'
           }`}
         >
           Close
@@ -295,6 +299,23 @@ export function TradeForm({
           <span>75%</span>
           <span>100%</span>
         </div>
+        {/* Quick Percent Buttons for Mobile & Desktop */}
+        <div className="grid grid-cols-4 gap-1 mt-1.5">
+          {[25, 50, 75, 100].map((pct) => (
+            <button
+              key={pct}
+              type="button"
+              onClick={() => applyPercent(pct)}
+              className={`py-0.5 rounded text-[10px] font-bold font-mono-num transition-all border cursor-pointer ${
+                percentSlider === pct
+                  ? 'bg-[#2a2a2a] text-[#0ecb81] border-[#0ecb81]/50 shadow-xs'
+                  : 'bg-[#151515] text-[#888] border-[#262626] hover:text-white hover:bg-[#202020]'
+              }`}
+            >
+              {pct}%
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 8. Available Balance with (+) icon */}
@@ -341,7 +362,7 @@ export function TradeForm({
               type="button"
               onClick={() => handleAction('buy')}
               disabled={qtyInSOL <= 0 || marginCost > availableBalance}
-              className="w-full py-2.5 bg-[#0ecb81] hover:bg-[#0ba367] disabled:opacity-40 rounded-lg text-white font-bold text-xs tracking-wide transition-all shadow-md active:scale-98"
+              className="w-full h-14 min-h-[56px] py-3.5 bg-[#0ecb81] hover:bg-[#0ba367] disabled:opacity-40 rounded-xl text-white font-extrabold text-base tracking-wide transition-all shadow-lg shadow-[#0ecb81]/25 active:scale-98 cursor-pointer flex items-center justify-center"
             >
               Open Long
             </button>
@@ -361,7 +382,7 @@ export function TradeForm({
               type="button"
               onClick={() => handleAction('sell')}
               disabled={qtyInSOL <= 0 || marginCost > availableBalance}
-              className="w-full py-2.5 bg-[#f6465d] hover:bg-[#d63449] disabled:opacity-40 rounded-lg text-white font-bold text-xs tracking-wide transition-all shadow-md active:scale-98"
+              className="w-full h-14 min-h-[56px] py-3.5 bg-[#f6465d] hover:bg-[#d63449] disabled:opacity-40 rounded-xl text-white font-extrabold text-base tracking-wide transition-all shadow-lg shadow-[#f6465d]/25 active:scale-98 cursor-pointer flex items-center justify-center"
             >
               Open Short
             </button>
@@ -384,7 +405,7 @@ export function TradeForm({
               type="button"
               onClick={() => handleAction('buy')}
               disabled={qtyInSOL <= 0}
-              className="w-full py-2.5 bg-[#0ecb81] hover:bg-[#0ba367] disabled:opacity-40 rounded-lg text-white font-bold text-xs tracking-wide transition-all shadow-md active:scale-98"
+              className="w-full h-14 min-h-[56px] py-3.5 bg-[#0ecb81] hover:bg-[#0ba367] disabled:opacity-40 rounded-xl text-white font-extrabold text-base tracking-wide transition-all shadow-lg shadow-[#0ecb81]/25 active:scale-98 cursor-pointer flex items-center justify-center"
             >
               Close Short
             </button>
@@ -404,7 +425,7 @@ export function TradeForm({
               type="button"
               onClick={() => handleAction('sell')}
               disabled={qtyInSOL <= 0}
-              className="w-full py-2.5 bg-[#f6465d] hover:bg-[#d63449] disabled:opacity-40 rounded-lg text-white font-bold text-xs tracking-wide transition-all shadow-md active:scale-98"
+              className="w-full h-14 min-h-[56px] py-3.5 bg-[#f6465d] hover:bg-[#d63449] disabled:opacity-40 rounded-xl text-white font-extrabold text-base tracking-wide transition-all shadow-lg shadow-[#f6465d]/25 active:scale-98 cursor-pointer flex items-center justify-center"
             >
               Close Long
             </button>

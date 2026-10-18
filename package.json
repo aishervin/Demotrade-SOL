@@ -8,6 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
+    "pages:build": "vite build",
+    "pages:deploy": "wrangler pages deploy dist --project-name=sol-futures-trading",
+    "deploy": "vite build && wrangler pages deploy dist --project-name=sol-futures-trading",
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -36,6 +39,7 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "wrangler": "^4.151.1"
   }
 }

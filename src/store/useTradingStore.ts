@@ -173,6 +173,14 @@ export function initTradingStore() {
 
       if (lastIdx >= 0 && existingCandles[lastIdx].time === candle.time) {
         existingCandles[lastIdx] = candle;
+      } else if (lastIdx >= 0 && candle.time < existingCandles[lastIdx].time) {
+        const foundIdx = existingCandles.findIndex((c) => c.time === candle.time);
+        if (foundIdx >= 0) {
+          existingCandles[foundIdx] = candle;
+        } else {
+          existingCandles.push(candle);
+          existingCandles.sort((a, b) => a.time - b.time);
+        }
       } else {
         existingCandles.push(candle);
       }
@@ -184,9 +192,19 @@ export function initTradingStore() {
       emitChange();
     },
     onHistoricalCandles: (historicalCandles) => {
+      // Strictly sort ascending and deduplicate
+      const sorted = [...historicalCandles].sort((a, b) => a.time - b.time);
+      const deduped: Candle[] = [];
+      let prevTime = -1;
+      for (const c of sorted) {
+        if (c.time > prevTime) {
+          deduped.push(c);
+          prevTime = c.time;
+        }
+      }
       state = {
         ...state,
-        candles: historicalCandles,
+        candles: deduped,
       };
       emitChange();
     },

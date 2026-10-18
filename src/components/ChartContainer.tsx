@@ -6,7 +6,6 @@
 import {
   createChart,
   IChartApi,
-  ISeriesApi,
   ColorType,
   LineStyle,
   CandlestickData,
@@ -23,11 +22,12 @@ import { formatPrice } from '../engine/decimal';
 import {
   Maximize2,
   Minimize2,
-  TrendingUp,
   Sliders,
-  Eye,
-  EyeOff,
-  RefreshCw,
+  RotateCcw,
+  Clock,
+  Activity,
+  Layers,
+  ChevronDown,
 } from 'lucide-react';
 
 interface ChartContainerProps {
@@ -38,6 +38,14 @@ interface ChartContainerProps {
   indicators: IndicatorConfig;
   onIndicatorsChange: (indicators: IndicatorConfig) => void;
   currentPrice: number;
+  priceChangePercent24h?: number;
+  priceChange24h?: number;
+  high24h?: number;
+  low24h?: number;
+  volume24h?: number;
+  fundingCountdown?: string;
+  fundingRateText?: string;
+  heightClass?: string;
 }
 
 const TIMEFRAMES: Timeframe[] = ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d'];
@@ -91,6 +99,14 @@ export function ChartContainer({
   indicators,
   onIndicatorsChange,
   currentPrice,
+  priceChangePercent24h = 0,
+  priceChange24h = 0,
+  high24h,
+  low24h,
+  volume24h,
+  fundingCountdown,
+  fundingRateText,
+  heightClass,
 }: ChartContainerProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -104,33 +120,30 @@ export function ChartContainer({
 
   // Price lines references
   const priceLinesRef = useRef<any[]>([]);
-  const hasFittedRef = useRef<boolean>(false);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showIndicatorMenu, setShowIndicatorMenu] = useState(false);
+  const [chartMode, setChartMode] = useState<'compact' | 'normal'>('compact');
 
-  // Reset fit on timeframe change
-  useEffect(() => {
-    hasFittedRef.current = false;
-  }, [timeframe]);
+  const isUp = priceChangePercent24h >= 0;
 
-  // Initialize TradingView lightweight chart
+  // Initialize TradingView lightweight chart with strict LTR isolation
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
     // Create chart
     const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight || 340,
+      width: chartContainerRef.current.clientWidth || 320,
+      height: chartContainerRef.current.clientHeight || 200,
       layout: {
         background: { type: ColorType.Solid, color: '#000000' },
         textColor: '#848e9c',
         fontFamily: "'JetBrains Mono', 'Plus Jakarta Sans', monospace",
-        fontSize: 11,
+        fontSize: 10,
       },
       grid: {
-        vertLines: { color: 'rgba(30, 36, 48, 0.45)', style: LineStyle.Dotted },
-        horzLines: { color: 'rgba(30, 36, 48, 0.45)', style: LineStyle.Dotted },
+        vertLines: { color: 'rgba(30, 36, 48, 0.35)', style: LineStyle.Dotted },
+        horzLines: { color: 'rgba(30, 36, 48, 0.35)', style: LineStyle.Dotted },
       },
       crosshair: {
         mode: 1,
@@ -150,25 +163,28 @@ export function ChartContainer({
       rightPriceScale: {
         borderColor: '#1c1c1c',
         scaleMargins: {
-          top: 0.1,
-          bottom: 0.22,
+          top: 0.08,
+          bottom: 0.16,
         },
+        visible: true,
+        entireTextOnly: true,
       },
       timeScale: {
         borderColor: '#1c1c1c',
         timeVisible: true,
         secondsVisible: false,
-        barSpacing: 9,
+        barSpacing: 7,
         minBarSpacing: 3,
-        rightOffset: 6,
-        fixLeftEdge: false,
+        rightOffset: 4,
+        fixLeftEdge: true, // Fixes candles starting properly from left to right!
         fixRightEdge: false,
+        shiftVisibleRangeOnNewBar: true,
       },
       handleScroll: {
         mouseWheel: true,
         pressedMouseMove: true,
         horzTouchDrag: true,
-        vertTouchDrag: true,
+        vertTouchDrag: false, // Prevents blocking vertical mobile page scroll!
       },
       handleScale: {
         axisPressedMouseMove: true,
@@ -199,7 +215,7 @@ export function ChartContainer({
     });
     volumeSeries.priceScale().applyOptions({
       scaleMargins: {
-        top: 0.8,
+        top: 0.82,
         bottom: 0,
       },
     });
@@ -225,20 +241,20 @@ export function ChartContainer({
 
     // Add Bollinger Bands Series
     const bbUpper = chart.addSeries(LineSeries, {
-      color: 'rgba(41, 98, 255, 0.6)',
+      color: 'rgba(56, 189, 248, 0.7)',
       lineWidth: 1,
       lineStyle: LineStyle.Dotted,
       priceLineVisible: false,
       lastValueVisible: false,
     });
     const bbMiddle = chart.addSeries(LineSeries, {
-      color: 'rgba(41, 98, 255, 0.4)',
+      color: 'rgba(56, 189, 248, 0.45)',
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: false,
     });
     const bbLower = chart.addSeries(LineSeries, {
-      color: 'rgba(41, 98, 255, 0.6)',
+      color: 'rgba(56, 189, 248, 0.7)',
       lineWidth: 1,
       lineStyle: LineStyle.Dotted,
       priceLineVisible: false,
@@ -248,39 +264,53 @@ export function ChartContainer({
     bbMiddleSeriesRef.current = bbMiddle;
     bbLowerSeriesRef.current = bbLower;
 
-    // Resize observer
+    // Responsive resize observer
     const handleResize = () => {
       if (chartContainerRef.current && chart) {
         chart.applyOptions({
           width: chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight || 340,
+          height: chartContainerRef.current.clientHeight || 200,
         });
+        chart.timeScale().fitContent();
       }
     };
 
     window.addEventListener('resize', handleResize);
 
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    resizeObserver.observe(chartContainerRef.current);
+
     return () => {
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       chart.remove();
       chartRef.current = null;
     };
   }, []);
 
+  // Fit content helper
+  const fitChart = () => {
+    if (chartRef.current) {
+      chartRef.current.timeScale().fitContent();
+    }
+  };
+
   // Update chart data whenever candles or indicators change
   useEffect(() => {
     if (!candleSeriesRef.current || candles.length === 0) return;
 
-    // Format candlestick data
+    // Format and strictly sort candlestick data ascending
     const sorted = [...candles].sort((a, b) => a.time - b.time);
 
-    // Filter duplicates by time
+    // Strictly deduplicate by time (Lightweight Charts requirement)
     const deduped: Candle[] = [];
-    const seenTimes = new Set<number>();
+    let lastTime = -1;
     for (const c of sorted) {
-      if (!seenTimes.has(c.time)) {
-        seenTimes.add(c.time);
+      if (c.time > lastTime) {
         deduped.push(c);
+        lastTime = c.time;
       }
     }
 
@@ -294,11 +324,12 @@ export function ChartContainer({
 
     candleSeriesRef.current.setData(candleData);
 
-    // Auto fit content so candles span properly from left to right
-    if (!hasFittedRef.current && candleData.length > 5 && chartRef.current) {
-      chartRef.current.timeScale().fitContent();
-      hasFittedRef.current = true;
-    }
+    // Fit content smoothly so candles span neatly from left to right
+    requestAnimationFrame(() => {
+      if (chartRef.current && candleData.length > 5) {
+        chartRef.current.timeScale().fitContent();
+      }
+    });
 
     // Update volume series
     if (volumeSeriesRef.current) {
@@ -306,7 +337,7 @@ export function ChartContainer({
         const volumeData: HistogramData<Time>[] = deduped.map((c) => ({
           time: c.time as Time,
           value: c.volume,
-          color: c.close >= c.open ? 'rgba(14, 203, 129, 0.25)' : 'rgba(246, 70, 93, 0.25)',
+          color: c.close >= c.open ? 'rgba(14, 203, 129, 0.28)' : 'rgba(246, 70, 93, 0.28)',
         }));
         volumeSeriesRef.current.setData(volumeData);
       } else {
@@ -347,7 +378,7 @@ export function ChartContainer({
         bbLowerSeriesRef.current.setData([]);
       }
     }
-  }, [candles, indicators]);
+  }, [candles, indicators, timeframe]);
 
   // Update position lines on chart (Entry price, Liquidation price, TP/SL lines)
   useEffect(() => {
@@ -420,49 +451,99 @@ export function ChartContainer({
   return (
     <div
       dir="ltr"
-      style={{ direction: 'ltr' }}
-      className={`relative flex flex-col bg-black border-b border-[#1c1c1c] transition-all duration-200 ${
-        isFullscreen ? 'fixed inset-0 z-50 h-screen w-screen' : 'h-[270px] sm:h-[320px] md:h-[380px] w-full'
+      style={{
+        direction: 'ltr',
+        unicodeBidi: 'isolate',
+        textAlign: 'left',
+      }}
+      className={`relative flex flex-col bg-black border-b border-[#1c1c1c] w-full transition-all duration-150 ${
+        isFullscreen
+          ? 'fixed inset-0 z-50 h-screen w-screen'
+          : heightClass
+          ? heightClass
+          : chartMode === 'compact'
+          ? 'h-[260px] sm:h-[300px] lg:h-[350px]'
+          : 'h-[380px] sm:h-[440px] lg:h-[500px]'
       }`}
     >
-      {/* Timeframe & Indicator Bar */}
-      <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[#1c1c1c] bg-black text-xs select-none">
-        {/* Timeframe Buttons */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-          <span className="text-[#64748b] text-[10px] font-semibold uppercase tracking-wider mr-1 hidden sm:inline">
-            Time
-          </span>
-          {TIMEFRAMES.map((tf) => (
-            <button
-              key={tf}
-              onClick={() => onTimeframeChange(tf)}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                timeframe === tf
-                  ? 'bg-[#1e293b] text-[#38bdf8] font-semibold'
-                  : 'text-[#848e9c] hover:text-[#d1d4dc] hover:bg-[#151b26]'
+      {/* 1. Integrated Compact Header with Price, 24h stats, and Controls */}
+      <div className="flex flex-wrap items-center justify-between px-2.5 py-1 bg-[#090909] border-b border-[#1c1c1c] text-xs gap-1 select-none">
+        {/* Left: Live Price & 24h Change */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-baseline gap-1.5">
+            <span
+              className={`text-base sm:text-lg font-black font-mono-num tracking-tight transition-colors duration-200 ${
+                isUp ? 'text-[#0ecb81]' : 'text-[#f6465d]'
               }`}
             >
-              {tf}
-            </button>
-          ))}
+              ${formatPrice(currentPrice)}
+            </span>
+            <span
+              className={`text-[10px] font-bold font-mono-num px-1.5 py-0.2 rounded transition-colors ${
+                isUp
+                  ? 'text-[#0ecb81] bg-[#0ecb81]/15 border border-[#0ecb81]/30'
+                  : 'text-[#f6465d] bg-[#f6465d]/15 border border-[#f6465d]/30'
+              }`}
+            >
+              {isUp ? '+' : ''}
+              {priceChangePercent24h.toFixed(2)}%
+            </span>
+          </div>
+
+          {/* 24h High, Low & Volume (Responsive) */}
+          <div className="hidden xs:flex items-center gap-2 text-[10px] text-[#777] font-mono-num border-l border-[#222] pl-2">
+            <div>
+              <span className="text-[#555] mr-0.5">24hH</span>
+              <span className="text-[#bbb]">${formatPrice(high24h || currentPrice * 1.015)}</span>
+            </div>
+            <div>
+              <span className="text-[#555] mr-0.5">24hL</span>
+              <span className="text-[#bbb]">${formatPrice(low24h || currentPrice * 0.985)}</span>
+            </div>
+            {volume24h && (
+              <div className="hidden md:block">
+                <span className="text-[#555] mr-0.5">Vol</span>
+                <span className="text-[#bbb]">{(volume24h / 1000).toFixed(0)}K</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Indicator & Controls */}
-        <div className="flex items-center gap-1.5 ml-2">
-          {/* Indicator toggles dropdown */}
+        {/* Right: Timeframes & Tools */}
+        <div className="flex items-center gap-1">
+          {/* Timeframe Chips */}
+          <div className="flex items-center bg-[#141414] rounded-md p-0.5 border border-[#222]">
+            {['1m', '5m', '15m', '1h', '4h', '1d'].map((tf) => (
+              <button
+                key={tf}
+                onClick={() => onTimeframeChange(tf as Timeframe)}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                  timeframe === tf
+                    ? 'bg-[#2a2a2a] text-[#38bdf8] shadow-xs'
+                    : 'text-[#777] hover:text-[#ddd]'
+                }`}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
+
+          {/* Indicators dropdown */}
           <div className="relative">
             <button
               onClick={() => setShowIndicatorMenu(!showIndicatorMenu)}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
-                showIndicatorMenu ? 'bg-[#1e293b] text-[#38bdf8]' : 'text-[#848e9c] hover:text-[#d1d4dc] hover:bg-[#151b26]'
+              className={`p-1 rounded text-[11px] transition-colors border ${
+                showIndicatorMenu
+                  ? 'bg-[#1e293b] text-[#38bdf8] border-[#38bdf8]/40'
+                  : 'bg-[#141414] text-[#888] hover:text-[#ddd] border-[#222]'
               }`}
+              title="Technical Indicators"
             >
               <Sliders size={12} />
-              <span className="hidden sm:inline">Indicators</span>
             </button>
 
             {showIndicatorMenu && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-[#121722] border border-[#232b3b] rounded-lg shadow-2xl p-2 z-50 text-xs text-[#d1d4dc]">
+              <div className="absolute right-0 top-full mt-1 w-44 bg-[#121722] border border-[#232b3b] rounded-lg shadow-2xl p-2 z-50 text-xs text-[#d1d4dc]">
                 <div className="font-semibold text-[#848e9c] text-[10px] uppercase pb-1 mb-1 border-b border-[#1e2430]">
                   Overlays & Signals
                 </div>
@@ -506,35 +587,69 @@ export function ChartContainer({
             )}
           </div>
 
-          {/* Fullscreen Button */}
+          {/* Reset / Fit View button */}
+          <button
+            onClick={fitChart}
+            className="p-1 rounded bg-[#141414] text-[#888] hover:text-[#ddd] border border-[#222]"
+            title="Reset View / Fit Candles"
+          >
+            <RotateCcw size={12} />
+          </button>
+
+          {/* Compact / Expand Toggle */}
+          <button
+            onClick={() => setChartMode(chartMode === 'compact' ? 'normal' : 'compact')}
+            className="hidden sm:flex items-center gap-0.5 px-1.5 py-1 rounded bg-[#141414] text-[#888] hover:text-[#ddd] border border-[#222] text-[10px] font-semibold"
+            title="Toggle Chart Height"
+          >
+            <span>{chartMode === 'compact' ? 'Expand' : 'Compact'}</span>
+          </button>
+
+          {/* Fullscreen Toggle */}
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-1 rounded text-[#848e9c] hover:text-[#d1d4dc] hover:bg-[#151b26]"
+            className="p-1 rounded bg-[#141414] text-[#888] hover:text-[#ddd] border border-[#222]"
             title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Chart'}
           >
-            {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            {isFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
           </button>
         </div>
       </div>
 
-      {/* Chart Canvas Container */}
+      {/* 2. Chart Canvas Container (strictly isolated LTR) */}
       <div
         ref={chartContainerRef}
         dir="ltr"
-        style={{ direction: 'ltr' }}
-        className="flex-1 w-full h-full cursor-crosshair"
+        style={{
+          direction: 'ltr',
+          unicodeBidi: 'isolate',
+          textAlign: 'left',
+        }}
+        className="flex-1 w-full h-full cursor-crosshair overflow-hidden"
       />
 
-      {/* Real-time Indicator Legend overlay */}
-      <div className="absolute left-3 top-10 flex flex-wrap gap-2 text-[10px] font-mono-num pointer-events-none z-10 opacity-80">
+      {/* 3. Real-time Indicator Legend overlay */}
+      <div className="absolute left-2.5 bottom-1.5 flex flex-wrap gap-1.5 text-[9px] font-mono-num pointer-events-none z-10 opacity-75">
         {indicators.showEMA9 && (
-          <span className="text-[#f0b90b] bg-[#0c1017]/80 px-1 py-0.5 rounded">EMA(9)</span>
+          <span className="text-[#f0b90b] bg-[#0c1017]/85 px-1 py-0.2 rounded border border-[#f0b90b]/20">
+            EMA(9)
+          </span>
         )}
         {indicators.showEMA21 && (
-          <span className="text-[#8b5cf6] bg-[#0c1017]/80 px-1 py-0.5 rounded">EMA(21)</span>
+          <span className="text-[#8b5cf6] bg-[#0c1017]/85 px-1 py-0.2 rounded border border-[#8b5cf6]/20">
+            EMA(21)
+          </span>
         )}
         {indicators.showBollingerBands && (
-          <span className="text-[#38bdf8] bg-[#0c1017]/80 px-1 py-0.5 rounded">BOLL(20,2)</span>
+          <span className="text-[#38bdf8] bg-[#0c1017]/85 px-1 py-0.2 rounded border border-[#38bdf8]/20">
+            BOLL(20,2)
+          </span>
+        )}
+        {fundingRateText && (
+          <span className="text-[#888] bg-[#0c1017]/85 px-1 py-0.2 rounded border border-[#333]">
+            Funding: <span className="text-[#0ecb81]">{fundingRateText}</span>
+            {fundingCountdown ? ` in ${fundingCountdown}` : ''}
+          </span>
         )}
       </div>
     </div>

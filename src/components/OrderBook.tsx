@@ -16,7 +16,6 @@ interface OrderBookProps {
   fundingRateText?: string;
   fundingCountdown?: string;
   onPriceSelect?: (price: number) => void;
-  onToggleChart?: () => void;
 }
 
 export function OrderBook({
@@ -26,7 +25,6 @@ export function OrderBook({
   fundingRateText = '+0.0100%',
   fundingCountdown = '06:32:22',
   onPriceSelect,
-  onToggleChart,
 }: OrderBookProps) {
   const [precision, setPrecision] = useState<number>(2);
 
@@ -100,11 +98,11 @@ export function OrderBook({
         })}
       </div>
 
-      {/* 4. Center Price with 24h % and Interactive Arrow to Chart */}
+      {/* 4. Center Price with 24h % (Tap to fill price in order form) */}
       <div
-        onClick={onToggleChart}
+        onClick={() => onPriceSelect && onPriceSelect(lastPrice)}
         className="my-1.5 py-1 px-1 flex items-center justify-between cursor-pointer hover:bg-[#141414] rounded transition-colors group"
-        title="Tap to view / toggle Candlestick Chart"
+        title="Tap to use current price in order form"
       >
         <div className="flex flex-col">
           <span
@@ -122,7 +120,6 @@ export function OrderBook({
             </span>
           </span>
         </div>
-        <ChevronRight size={16} className="text-[#888] group-hover:text-white transition-colors" />
       </div>
 
       {/* 5. Bids (Buy Orders - Green) */}
