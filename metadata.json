@@ -1,0 +1,6 @@
+{
+  "name": "ApexFutures - SOL/USDT Pro Paper Trading",
+  "description": "High-performance mobile-first SOL/USDT perpetual futures demo trading platform with live WebSocket market data, 75x leverage, interactive TradingView charts, and real-time PnL simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
